@@ -15,7 +15,7 @@ st.markdown("""
 @st.cache_data
 def cargar_datos():
     # Usamos el nombre exacto que aparece en tu repositorio
-    archivo_base = "EE 2026.xlsx - ESTABLECIMIENTOS_ABR2026.csv"
+    archivo_base = "EE 2026.xlsx"
     df = pd.read_csv(archivo_base, dtype=str)
     df['EMAIL'] = df['EMAIL'].str.strip().str.lower()
     return df
@@ -63,4 +63,4 @@ try:
 
 except Exception as e:
     st.error(f"Error al cargar la base de datos: {e}")
-    st.info("Asegúrate de que el archivo 'EE 2026.xlsx - ESTABLECIMIENTOS_ABR2026.csv' esté en la misma carpeta que este script.")
+    st.info("Asegúrate de que el archivo 'EE 2026.xlsx' esté en la misma carpeta que este script.")
