@@ -184,3 +184,36 @@ try:
 
 except Exception as e:
     st.error(f"Error de carga: {e}")
+    # =====================================================================
+# 5. PANEL DE ADMINISTRACIÓN (ACCESO RESTRINGIDO)
+# =====================================================================
+st.markdown("---")
+st.subheader("🔒 Panel de Administración de Datos")
+
+# Campo de texto que oculta los caracteres ingresados
+clave_acceso = st.text_input("Ingrese la clave maestra para visualizar o descargar la base de datos consolidada:", type="password")
+
+# Aquí defines tu contraseña segura
+if clave_acceso == "AdminMEN2026": 
+    with st.expander("Ver base de datos consolidada (Acceso Autorizado)", expanded=True):
+        try:
+            if pd.io.common.file_exists('Consolidado_Encuestas_MEN.csv'):
+                df_revisar = pd.read_csv('Consolidado_Encuestas_MEN.csv', encoding='utf-8-sig')
+                st.dataframe(df_revisar) # Muestra la tabla interactiva
+                
+                # Botón para descargar el archivo directamente desde la web
+                csv = df_revisar.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(
+                    label="📥 Descargar Base Completa (.csv)",
+                    data=csv,
+                    file_name='Consolidado_Encuestas_MEN.csv',
+                    mime='text/csv',
+                )
+            else:
+                st.info("Aún no hay encuestas registradas en la base de datos.")
+        except Exception as e:
+            st.error(f"No se pudo cargar la vista previa: {e}")
+            
+elif clave_acceso != "":
+    # Si ingresan texto pero no es la clave correcta
+    st.error("❌ Clave incorrecta. Acceso denegado a la base de datos.")
