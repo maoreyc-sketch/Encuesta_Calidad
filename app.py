@@ -61,7 +61,7 @@ try:
             
             with col_btn1:
                 if not st.session_state.editando:
-                    if st.button("Actualizar"):
+                    if st.button("Actualizar Datos"):
                         st.session_state.editando = True
                         st.rerun()
                 else:
