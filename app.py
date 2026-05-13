@@ -95,7 +95,7 @@ try:
                 st.subheader("Fase 2: Diligenciamiento de Encuesta")
                 
                 # Ajuste 3: Se remueve "Identificación" de la lista de bloques
-                hojas = ["Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "docentes"]
+                hojas = ["Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "Docentes"]
                 tabs = st.tabs(hojas)
                 
                 if 'respuestas_encuesta' not in st.session_state:
