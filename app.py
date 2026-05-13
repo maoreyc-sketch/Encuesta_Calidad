@@ -41,26 +41,51 @@ try:
             if 'encuesta_iniciada' not in st.session_state:
                 st.session_state.encuesta_iniciada = False
 
+            # Ajuste 1: Adición de campos solicitados (Barrio, Teléfono, Depto, Municipio)
             col1, col2 = st.columns(2)
             bloqueado = not st.session_state.editando
             
             with col1:
-                nombre_act = st.text_input("Nombre", value=fila.get('NOMBRE_ESTABLECIMIENTO', ''), disabled=bloqueado)
+                nombre_act = st.text_input("Nombre del Establecimiento", value=fila.get('NOMBRE_ESTABLECIMIENTO', ''), disabled=bloqueado)
                 dane_act = st.text_input("Código DANE", value=fila.get('CODIGO_DANE', ''), disabled=bloqueado)
+                depto_act = st.text_input("Departamento", value=fila.get('DEPARTAMENTO', ''), disabled=bloqueado)
+                muni_act = st.text_input("Municipio / Secretaría", value=fila.get('SECRETARIA', ''), disabled=bloqueado)
             with col2:
                 rector_act = st.text_input("Rector", value=fila.get('RECTOR', ''), disabled=bloqueado)
                 dir_act = st.text_input("Dirección", value=fila.get('DIRECCION', ''), disabled=bloqueado)
+                barrio_act = st.text_input("Barrio / Vereda", value=fila.get('BARRIO_VEREDA', ''), disabled=bloqueado)
+                tel_act = st.text_input("Teléfono", value=fila.get('TELEFONO', ''), disabled=bloqueado)
 
-            if not st.session_state.editando:
-                if st.button("Actualizar"):
-                    st.session_state.editando = True
-                    st.rerun()
-            else:
-                if st.button("Guardar Información"):
-                    st.session_state.editando = False
-                    st.session_state.encuesta_iniciada = True
-                    st.success("Información actualizada exitosamente.")
-                    st.rerun()
+            # Ajuste 2: Lógica de botones (Actualizar vs Continuar)
+            col_btn1, col_btn2 = st.columns([1, 1])
+            
+            with col_btn1:
+                if not st.session_state.editando:
+                    if st.button("Actualizar"):
+                        st.session_state.editando = True
+                        st.rerun()
+                else:
+                    if st.button("Guardar Cambios"):
+                        st.session_state.datos_temporales = {
+                            'NOMBRE': nombre_act, 'DANE': dane_act, 'DEPTO': depto_act, 'MUNI': muni_act,
+                            'RECTOR': rector_act, 'DIR': dir_act, 'BARRIO': barrio_act, 'TEL': tel_act
+                        }
+                        st.session_state.editando = False
+                        st.session_state.encuesta_iniciada = True
+                        st.success("Información actualizada y guardada.")
+                        st.rerun()
+
+            with col_btn2:
+                # Botón de continuar si los datos son correctos de entrada
+                if not st.session_state.editando and not st.session_state.encuesta_iniciada:
+                    if st.button("Continuar con Encuesta"):
+                        # Se guardan los datos existentes sin modificaciones
+                        st.session_state.datos_temporales = {
+                            'NOMBRE': nombre_act, 'DANE': dane_act, 'DEPTO': depto_act, 'MUNI': muni_act,
+                            'RECTOR': rector_act, 'DIR': dir_act, 'BARRIO': barrio_act, 'TEL': tel_act
+                        }
+                        st.session_state.encuesta_iniciada = True
+                        st.rerun()
 
             # =====================================================================
             # 3. INICIO DE LA ENCUESTA (Fase 2)
@@ -69,7 +94,8 @@ try:
                 st.markdown("---")
                 st.subheader("Fase 2: Diligenciamiento de Encuesta")
                 
-                hojas = ["Identificación", "Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "docentes"]
+                # Ajuste 3: Se remueve "Identificación" de la lista de bloques
+                hojas = ["Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "docentes"]
                 tabs = st.tabs(hojas)
                 
                 if 'respuestas_encuesta' not in st.session_state:
@@ -86,7 +112,7 @@ try:
                                 preg = str(row.get('Pregunta / campo', row.get('Pregunta', '')))
                                 tipo = str(row.get('Tipo de respuesta', row.get('Tipo', ''))).lower()
                                 opts = str(row.get('Opciones o criterio', row.get('Opciones', '')))
-                                var = str(row.get('Variable', idx)).strip()
+                                var = str(row.get('Variable', f"{nombre_hoja}_{idx}")).strip()
                                 obligatorio = str(row.get('Obligatorio', '')).strip().lower() == 'sí'
                                 
                                 if preg and preg != 'nan':
@@ -96,73 +122,65 @@ try:
                                     if obligatorio and var not in st.session_state.campos_obligatorios:
                                         st.session_state.campos_obligatorios.append(var)
                                     
-                                    # Listas de selección
                                     if 'lista' in tipo or 'selección' in tipo:
                                         opciones = [o.strip() for o in opts.split(';')] if ';' in opts else [opts]
                                         opciones = ["Seleccionar..."] + opciones
-                                        valor_actual = st.session_state.respuestas_encuesta.get(var, "Seleccionar...")
-                                        idx_actual = opciones.index(valor_actual) if valor_actual in opciones else 0
-                                        
-                                        respuesta = st.selectbox("Seleccione:", opciones, index=idx_actual, key=f"sel_{var}", label_visibility="collapsed")
+                                        v_actual = st.session_state.respuestas_encuesta.get(var, "Seleccionar...")
+                                        idx_act = opciones.index(v_actual) if v_actual in opciones else 0
+                                        respuesta = st.selectbox("Seleccione:", opciones, index=idx_act, key=f"sel_{var}", label_visibility="collapsed")
                                         st.session_state.respuestas_encuesta[var] = respuesta
                                         
-                                    # Entradas numéricas (restringidas a enteros sin números negativos)
                                     elif 'numérico' in tipo:
-                                        valor_actual = st.session_state.respuestas_encuesta.get(var, 0)
-                                        respuesta = st.number_input("Cantidad:", min_value=0, step=1, value=int(valor_actual), key=f"num_{var}", label_visibility="collapsed")
+                                        v_actual = st.session_state.respuestas_encuesta.get(var, 0)
+                                        # Restricción: Números enteros, no negativos
+                                        respuesta = st.number_input("Cantidad:", min_value=0, step=1, value=int(v_actual), key=f"num_{var}", label_visibility="collapsed")
                                         st.session_state.respuestas_encuesta[var] = respuesta
                                         
-                                    # Texto libre
                                     else:
-                                        valor_actual = st.session_state.respuestas_encuesta.get(var, "")
-                                        respuesta = st.text_input("Respuesta:", value=valor_actual, key=f"txt_{var}", label_visibility="collapsed")
+                                        v_actual = st.session_state.respuestas_encuesta.get(var, "")
+                                        respuesta = st.text_input("Respuesta:", value=v_actual, key=f"txt_{var}", label_visibility="collapsed")
                                         st.session_state.respuestas_encuesta[var] = respuesta
                                         
                                     st.markdown("<br>", unsafe_allow_html=True)
                                     
                         except Exception as e:
-                            st.error(f"No se pudo cargar la hoja '{nombre_hoja}': {e}")
+                            st.error(f"Error en bloque '{nombre_hoja}': {e}")
 
                 # =====================================================================
-                # 4. VALIDACIÓN Y GUARDADO DE ENCUESTA
+                # 4. VALIDACIÓN Y GUARDADO FINAL
                 # =====================================================================
                 st.markdown("---")
                 
-                def validar_formulario():
-                    faltantes = []
-                    for campo in st.session_state.campos_obligatorios:
-                        valor = st.session_state.respuestas_encuesta.get(campo)
-                        if valor is None or str(valor).strip() == "" or str(valor) == "Seleccionar...":
-                            faltantes.append(campo)
-                    return faltantes
+                def validar_faltantes():
+                    faltan = []
+                    for c in st.session_state.campos_obligatorios:
+                        val = st.session_state.respuestas_encuesta.get(c)
+                        if val is None or str(val).strip() == "" or str(val) == "Seleccionar...":
+                            faltan.append(c)
+                    return faltan
 
-                col1, col2, col3 = st.columns([1, 2, 1])
-                with col2:
+                col_f1, col_f2, col_f3 = st.columns([1, 2, 1])
+                with col_f2:
                     if st.button("💾 Finalizar y Enviar Encuesta", use_container_width=True):
-                        campos_faltantes = validar_formulario()
-                        
-                        if campos_faltantes:
-                            st.error(f"⚠️ Faltan preguntas obligatorias por responder (*). Por favor revise las pestañas.")
+                        err = validar_faltantes()
+                        if err:
+                            st.error(f"⚠️ Por favor complete todas las preguntas obligatorias (*).")
                         else:
-                            datos_finales = {
-                                'EMAIL_INSTITUCIONAL': email_ingresado,
-                                'NOMBRE_ESTABLECIMIENTO': fila.get('NOMBRE_ESTABLECIMIENTO', ''),
-                                'CODIGO_DANE': fila.get('CODIGO_DANE', '')
+                            final_data = {
+                                'EMAIL_VALIDADO': email_ingresado,
+                                **st.session_state.datos_temporales,
+                                **st.session_state.respuestas_encuesta
                             }
-                            datos_finales.update(st.session_state.respuestas_encuesta)
-                            
-                            df_exportar = pd.DataFrame([datos_finales])
-                            archivo_salida = 'Consolidado_Encuestas_MEN.csv'
-                            
+                            df_final = pd.DataFrame([final_data])
                             try:
-                                df_exportar.to_csv(archivo_salida, mode='a', header=not pd.io.common.file_exists(archivo_salida), index=False, encoding='utf-8-sig')
-                                st.success("✅ ¡Información procesada y almacenada con éxito!")
+                                df_final.to_csv('Consolidado_Encuestas_MEN.csv', mode='a', header=not pd.io.common.file_exists('Consolidado_Encuestas_MEN.csv'), index=False, encoding='utf-8-sig')
+                                st.success("✅ Encuesta enviada correctamente.")
                                 st.balloons()
                             except Exception as e:
-                                st.error(f"Error al guardar datos: {e}")
+                                st.error(f"Error al guardar: {e}")
 
         else:
-            st.error("El correo no se encuentra en la base de datos.")
+            st.error("Correo no encontrado.")
 
 except Exception as e:
-    st.error(f"Error técnico: {e}")
+    st.error(f"Error de carga: {e}")
