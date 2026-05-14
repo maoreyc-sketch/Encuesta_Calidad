@@ -59,7 +59,7 @@ def es_duplicado(email):
     return False
 
 # Inicialización de estados para no perder información
-hojas = ["Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "docentes"]
+hojas = ["Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "Docentes"]
 
 if 'iniciado' not in st.session_state: st.session_state.iniciado = False
 if 'encuesta_iniciada' not in st.session_state: st.session_state.encuesta_iniciada = False
