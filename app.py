@@ -146,7 +146,7 @@ else:
                     st.markdown("---")
                     st.subheader("Fase 2: Módulos de la Encuesta")
                     
-                    hojas = ["Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "docentes"]
+                    hojas = ["Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "Docentes"]
                     
                     # Barra de progreso y menú de navegación que reemplaza st.tabs
                     progreso = (st.session_state.paso_encuesta + 1) / len(hojas)
