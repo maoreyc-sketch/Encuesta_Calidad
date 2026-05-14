@@ -204,8 +204,12 @@ else:
             with c_de:
                 if st.session_state.paso < len(hojas) - 1:
                     if st.button("Siguiente Bloque ➡️"):
-                        st.session_state.paso += 1
-                        st.rerun()
+                       faltan = [c for c in st.session_state.oblig if not st.session_state.resp_enc.get(c) or str(st.session_state.resp_enc.get(c)).strip() in ["", "Seleccionar..."]]
+                    if faltan:
+                            st.error("⚠️ Por favor responda todas las preguntas obligatorias (*) de este bloque antes de continuar.")
+                    else:
+                            st.session_state.paso += 1
+                            st.rerun() 
                 else:
                     if st.button("💾 FINALIZAR Y ENVIAR ENCUESTA"):
                         # Validación de obligatorios simplificada
