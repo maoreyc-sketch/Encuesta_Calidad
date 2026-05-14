@@ -35,10 +35,10 @@ with col_tit:
         <div style='text-align: left;'>
             <h1 style='font-family: Arial; font-size: 20pt; font-weight: bold; margin-bottom: 0;'>
                 Ministerio de Educación Nacional
-            <h2 style='font-family: Arial; font-size: 16pt; font-weight: bold; color: #C935B7;'>
+            <h1 style='font-family: Arial; font-size: 16pt; font-weight: bold; color: #C935B7;'>
                 Encuesta de Calidad en la Información
             </h2>
-        </div>
+        </div> 
     """, unsafe_allow_html=True)
 
 st.markdown("<hr>", unsafe_allow_html=True)
