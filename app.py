@@ -28,7 +28,7 @@ col_logo, col_tit = st.columns([1, 4]) # Crea dos columnas (una pequeña para el
 
 with col_logo:
     # Reemplaza "tu_imagen.png" por el nombre real de tu archivo de imagen
-    st.image("tu_imagen.png", width=130) 
+    st.image("logo_min.png", width=130) 
 
 with col_tit:
     st.markdown("""
