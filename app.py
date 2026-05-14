@@ -24,7 +24,7 @@ st.markdown("""
 # =====================================================================
 # ENCABEZADO INSTITUCIONAL CON LOGO
 # =====================================================================
-col_logo, col_tit = st.columns([1, 4]) # Crea dos columnas (una pequeña para el logo y otra para el texto)
+col_logo, col_tit = st.columns([2, 4]) # Crea dos columnas (una pequeña para el logo y otra para el texto)
 
 with col_logo:
     # Reemplaza "tu_imagen.png" por el nombre real de tu archivo de imagen
@@ -33,9 +33,9 @@ with col_logo:
 with col_tit:
     st.markdown("""
         <div style='text-align: left;'>
-            <h1 style='font-family: Arial; font-size: 18pt; font-weight: bold; margin-bottom: 0;'>
+            <h1 style='font-family: Arial; font-size: 20pt; font-weight: bold; margin-bottom: 0;'>
                 Ministerio de Educación Nacional
-            <h2 style='font-family: Arial; font-size: 14pt; font-weight: bold; color: #444444;'>
+            <h2 style='font-family: Arial; font-size: 16pt; font-weight: bold; color: #3333;'>
                 Encuesta de Calidad en la Información
             </h2>
         </div>
