@@ -35,7 +35,7 @@ with col_tit:
             <h1 style='font-family: Arial; font-size: 20pt; font-weight: bold; margin-bottom: 0;'>
                 Ministerio de Educación Nacional
             </h1>
-            <h2 style='font-family: Arial; font-size: 16pt; font-weight: bold; color: #952788;'>
+            <h2 style='font-family: Arial; font-size: 16pt; font-weight: bold; color: #4E1F79;'>
                 Encuesta de Calidad en la Información
             </h2>
         </div>
