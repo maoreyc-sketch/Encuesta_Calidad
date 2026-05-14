@@ -3,8 +3,10 @@ import pandas as pd
 from datetime import datetime
 
 # =====================================================================
-# 1. ESTILOS MEN
+# 1. CONFIGURACIÓN Y ESTILOS MEN
 # =====================================================================
+st.set_page_config(page_title="Encuesta Calidad MEN", layout="wide")
+
 st.markdown("""
     <h1 style='font-family: Arial; font-size: 18pt; font-weight: bold; text-align: center;'>
         Ministerio de Educación Nacional
@@ -16,279 +18,205 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =====================================================================
-# 2. FUNCIONES DE CARGA Y VALIDACIÓN
+# 2. FUNCIONES DE CARGA Y LÓGICA DE NEGOCIO
 # =====================================================================
 @st.cache_data
 def cargar_datos_ee():
     archivo_ee = "EE 2026.xlsx"
-    df = pd.read_excel(archivo_ee, sheet_name=0, dtype=str)
-    if 'EMAIL' in df.columns:
-        df['EMAIL'] = df['EMAIL'].str.strip().str.lower()
-    return df
+    try:
+        df = pd.read_excel(archivo_ee, sheet_name=0, dtype=str)
+        if 'EMAIL' in df.columns:
+            df['EMAIL'] = df['EMAIL'].str.strip().str.lower()
+        return df
+    except Exception as e:
+        st.error(f"Error al cargar base maestra: {e}")
+        return pd.DataFrame()
 
 def verificar_duplicidad(email):
-    # Ajuste 2: Evitar duplicidad buscando en el consolidado histórico
     if pd.io.common.file_exists('Consolidado_Encuestas_MEN.csv'):
         try:
-            df_historico = pd.read_csv('Consolidado_Encuestas_MEN.csv', encoding='utf-8-sig')
-            if 'EMAIL_VALIDADO' in df_historico.columns:
-                if email in df_historico['EMAIL_VALIDADO'].values:
-                    return True
-        except Exception:
+            df_h = pd.read_csv('Consolidado_Encuestas_MEN.csv', encoding='utf-8-sig')
+            if 'EMAIL_VALIDADO' in df_h.columns:
+                return email in df_h['EMAIL_VALIDADO'].values
+        except:
             pass
     return False
 
 # =====================================================================
-# 3. INICIO DE SESIÓN Y VARIABLES DE ESTADO
+# 3. GESTIÓN DE ESTADO DE SESIÓN
 # =====================================================================
 if 'iniciado' not in st.session_state:
     st.session_state.iniciado = False
+if 'encuesta_iniciada' not in st.session_state:
+    st.session_state.encuesta_iniciada = False
 if 'paso_encuesta' not in st.session_state:
     st.session_state.paso_encuesta = 0
 if 'editando' not in st.session_state:
     st.session_state.editando = False
-if 'encuesta_iniciada' not in st.session_state:
-    st.session_state.encuesta_iniciada = False
+if 'finalizado' not in st.session_state:
+    st.session_state.finalizado = False
 
-# Ajustes 5 y 6: Pantalla inicial con campos de correo y nombre
+# =====================================================================
+# 4. FLUJO DE USUARIO (ENCUESTA)
+# =====================================================================
+
+# Pantalla de éxito final (Ajuste 2: Sin botón de repetir, solo reset al inicio)
+if st.session_state.finalizado:
+    st.success("✅ ¡Encuesta procesada exitosamente! Gracias por su participación.")
+    st.balloons()
+    if st.button("Volver al Inicio y Salir"):
+        st.session_state.clear()
+        st.rerun()
+    st.stop()
+
+# Inicio de sesión
 if not st.session_state.iniciado:
-    st.info("👋 Bienvenido. Por favor ingrese los datos para acceder al sistema.")
-    
-    col_ini1, col_ini2 = st.columns(2)
-    with col_ini1:
-        email_temp = st.text_input("Correo electrónico del establecimiento:")
-    with col_ini2:
-        nombre_temp = st.text_input("Nombre de quien diligencia:")
+    st.info("👋 Bienvenido. Ingrese los datos para acceder.")
+    c1, c2 = st.columns(2)
+    with c1:
+        email_t = st.text_input("Correo electrónico del establecimiento:")
+    with c2:
+        nombre_t = st.text_input("Nombre de quien diligencia:")
         
     if st.button("🚀 Iniciar Encuesta", use_container_width=True):
-        if not email_temp or not nombre_temp:
-            st.warning("⚠️ Debe ingresar tanto el correo como su nombre para continuar.")
+        if not email_t or not nombre_t:
+            st.warning("Debe ingresar correo y nombre.")
+        elif verificar_duplicidad(email_t.strip().lower()):
+            st.error("❌ Este establecimiento ya registró su encuesta.")
         else:
-            st.session_state.email_ingresado = email_temp.strip().lower()
-            st.session_state.nombre_diligencia = nombre_temp.strip()
+            st.session_state.email_ingresado = email_t.strip().lower()
+            st.session_state.nombre_diligencia = nombre_t.strip()
             st.session_state.iniciado = True
             st.rerun()
 
 else:
-    # Si ya inició, verificamos si hay duplicidad antes de continuar
-    if verificar_duplicidad(st.session_state.email_ingresado):
-        st.error(f"❌ El establecimiento con correo '{st.session_state.email_ingresado}' ya registró una encuesta en el sistema.")
-        st.warning("Para evitar duplicidad en la base de datos, no es posible diligenciarla nuevamente.")
-        if st.button("Volver al inicio"):
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.rerun()
-    else:
-        try:
-            df_ee = cargar_datos_ee()
-            resultado = df_ee[df_ee['EMAIL'] == st.session_state.email_ingresado]
-            
-            if not resultado.empty:
-                fila = resultado.iloc[0]
-                
-                # =====================================================================
-                # FASE 1: VALIDACIÓN DE DATOS
-                # =====================================================================
-                if not st.session_state.encuesta_iniciada:
-                    st.subheader("Fase 1: Verificación de Datos Institucionales")
-                    bloqueado = not st.session_state.editando
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        nombre_act = st.text_input("Nombre del Establecimiento", value=fila.get('NOMBRE_ESTABLECIMIENTO', ''), disabled=bloqueado)
-                        dane_act = st.text_input("Código DANE", value=fila.get('CODIGO_DANE', ''), disabled=bloqueado)
-                        depto_act = st.text_input("Departamento", value=fila.get('DEPARTAMENTO', ''), disabled=bloqueado)
-                        muni_act = st.text_input("Municipio / Secretaría", value=fila.get('SECRETARIA', ''), disabled=bloqueado)
-                        # Ajuste 7: Campo DANE Nuevo
-                        dane_nuevo = st.text_input("Código DANE Nuevo (*Solo si aplica)", value="", disabled=bloqueado)
-                    with col2:
-                        rector_act = st.text_input("Rector", value=fila.get('RECTOR', ''), disabled=bloqueado)
-                        dir_act = st.text_input("Dirección", value=fila.get('DIRECCION', ''), disabled=bloqueado)
-                        barrio_act = st.text_input("Barrio / Vereda", value=fila.get('BARRIO_VEREDA', ''), disabled=bloqueado)
-                        tel_act = st.text_input("Teléfono", value=fila.get('TELEFONO', ''), disabled=bloqueado)
-                        # Ajuste 7: Campo Observaciones
-                        observaciones = st.text_area("Observaciones", value="", disabled=bloqueado, height=68)
+    df_ee = cargar_datos_ee()
+    res = df_ee[df_ee['EMAIL'] == st.session_state.email_ingresado]
+    
+    if not res.empty:
+        fila = res.iloc[0]
+        
+        # Fase 1: Actualización de datos
+        if not st.session_state.encuesta_iniciada:
+            st.subheader("Fase 1: Verificación de Datos")
+            bloq = not st.session_state.editando
+            col_a, col_b = st.columns(2)
+            with col_a:
+                nom = st.text_input("Nombre", value=fila.get('NOMBRE_ESTABLECIMIENTO',''), disabled=bloq)
+                dan = st.text_input("Código DANE", value=fila.get('CODIGO_DANE',''), disabled=bloq)
+                dep = st.text_input("Departamento", value=fila.get('DEPARTAMENTO',''), disabled=bloq)
+                mun = st.text_input("Municipio", value=fila.get('SECRETARIA',''), disabled=bloq)
+                dan_n = st.text_input("Código DANE Nuevo (Si aplica)", value="", disabled=bloq)
+            with col_b:
+                rec = st.text_input("Rector", value=fila.get('RECTOR',''), disabled=bloq)
+                dir_e = st.text_input("Dirección", value=fila.get('DIRECCION',''), disabled=bloq)
+                bar = st.text_input("Barrio / Vereda", value=fila.get('BARRIO_VEREDA',''), disabled=bloq)
+                tel = st.text_input("Teléfono", value=fila.get('TELEFONO',''), disabled=bloq)
+                obs = st.text_area("Observaciones", value="", disabled=bloq, height=68)
 
-                    # Botones de Fase 1
-                    col_btn1, col_btn2 = st.columns([1, 1])
-                    with col_btn1:
-                        if not st.session_state.editando:
-                            if st.button("Actualizar"):
-                                st.session_state.editando = True
-                                st.rerun()
-                        else:
-                            if st.button("Guardar Cambios"):
-                                st.session_state.datos_temporales = {
-                                    'NOMBRE': nombre_act, 'DANE': dane_act, 'DEPTO': depto_act, 'MUNI': muni_act,
-                                    'RECTOR': rector_act, 'DIR': dir_act, 'BARRIO': barrio_act, 'TEL': tel_act,
-                                    'DANE_NUEVO': dane_nuevo, 'OBSERVACIONES': observaciones
-                                }
-                                st.session_state.editando = False
-                                st.session_state.encuesta_iniciada = True
-                                st.success("Información actualizada.")
-                                st.rerun()
-
-                    with col_btn2:
-                        if not st.session_state.editando:
-                            if st.button("Continuar con Encuesta ➡️"):
-                                st.session_state.datos_temporales = {
-                                    'NOMBRE': nombre_act, 'DANE': dane_act, 'DEPTO': depto_act, 'MUNI': muni_act,
-                                    'RECTOR': rector_act, 'DIR': dir_act, 'BARRIO': barrio_act, 'TEL': tel_act,
-                                    'DANE_NUEVO': dane_nuevo, 'OBSERVACIONES': observaciones
-                                }
-                                st.session_state.encuesta_iniciada = True
-                                st.rerun()
-
-                # =====================================================================
-                # FASE 2: DILIGENCIAMIENTO DINÁMICO (Ajustes 3 y 4)
-                # =====================================================================
-                if st.session_state.encuesta_iniciada:
-                    st.markdown("---")
-                    st.subheader("Fase 2: Módulos de la Encuesta")
-                    
-                    hojas = ["Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "Docentes"]
-                    
-                    # Barra de progreso y menú de navegación que reemplaza st.tabs
-                    progreso = (st.session_state.paso_encuesta + 1) / len(hojas)
-                    st.progress(progreso)
-                    
-                    # Radio button horizontal que simula las pestañas
-                    menu_modulos = st.radio("Navegación:", hojas, index=st.session_state.paso_encuesta, horizontal=True, label_visibility="collapsed")
-                    if hojas.index(menu_modulos) != st.session_state.paso_encuesta:
-                        st.session_state.paso_encuesta = hojas.index(menu_modulos)
+            ca, cb = st.columns(2)
+            with ca:
+                if not st.session_state.editando:
+                    if st.button("Actualizar"):
+                        st.session_state.editando = True
+                        st.rerun()
+                else:
+                    if st.button("Guardar Cambios"):
+                        st.session_state.datos_temporales = {'NOMBRE':nom,'DANE':dan,'DEPTO':dep,'MUNI':mun,'RECTOR':rec,'DIR':dir_e,'BARRIO':bar,'TEL':tel,'DANE_N':dan_n,'OBS':obs}
+                        st.session_state.editando = False
+                        st.session_state.encuesta_iniciada = True
+                        st.rerun()
+            with cb:
+                if not st.session_state.editando:
+                    if st.button("Continuar con Encuesta ➡️"):
+                        st.session_state.datos_temporales = {'NOMBRE':nom,'DANE':dan,'DEPTO':dep,'MUNI':mun,'RECTOR':rec,'DIR':dir_e,'BARRIO':bar,'TEL':tel,'DANE_N':dan_n,'OBS':obs}
+                        st.session_state.encuesta_iniciada = True
                         st.rerun()
 
-                    if 'respuestas_encuesta' not in st.session_state:
-                        st.session_state.respuestas_encuesta = {}
-                    if 'campos_obligatorios' not in st.session_state:
-                        st.session_state.campos_obligatorios = []
+        # Fase 2: Bloques dinámicos
+        else:
+            st.markdown("---")
+            hojas = ["Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "Docentes"]
+            
+            # Ajuste 1: Radio button para navegación (al cambiar, st.rerun() manda al top)
+            st.radio("Progreso:", hojas, index=st.session_state.paso_encuesta, horizontal=True, key="nav_radio")
+            
+            if 'resp_enc' not in st.session_state: st.session_state.resp_enc = {}
+            if 'oblig' not in st.session_state: st.session_state.oblig = []
 
-                    nombre_hoja = hojas[st.session_state.paso_encuesta]
-                    st.markdown(f"#### Bloque: {nombre_hoja}")
+            hoja_act = hojas[st.session_state.paso_encuesta]
+            st.subheader(f"Módulo: {hoja_act}")
+            
+            try:
+                df_p = pd.read_excel("Encuesta_Calidad.xlsx", sheet_name=hoja_act, skiprows=2)
+                for idx, r in df_p.iterrows():
+                    p = str(r.get('Pregunta / campo', r.get('Pregunta','')))
+                    t = str(r.get('Tipo de respuesta', r.get('Tipo',''))).lower()
+                    o = str(r.get('Opciones o criterio', r.get('Opciones','')))
+                    v = str(r.get('Variable', f"{hoja_act}_{idx}")).strip()
+                    ob = str(r.get('Obligatorio','')).strip().lower() == 'sí'
                     
-                    try:
-                        df_preguntas = pd.read_excel("Encuesta_Calidad.xlsx", sheet_name=nombre_hoja, skiprows=2)
+                    if p and p != 'nan':
+                        st.write(f"**{p}** {'(*)' if ob else ''}")
+                        if ob and v not in st.session_state.oblig: st.session_state.oblig.append(v)
                         
-                        for idx, row in df_preguntas.iterrows():
-                            preg = str(row.get('Pregunta / campo', row.get('Pregunta', '')))
-                            tipo = str(row.get('Tipo de respuesta', row.get('Tipo', ''))).lower()
-                            opts = str(row.get('Opciones o criterio', row.get('Opciones', '')))
-                            var = str(row.get('Variable', f"{nombre_hoja}_{idx}")).strip()
-                            obligatorio = str(row.get('Obligatorio', '')).strip().lower() == 'sí'
-                            
-                            if preg and preg != 'nan':
-                                marca_req = " **(*)**" if obligatorio else ""
-                                st.write(f"**{preg}**{marca_req}")
-                                
-                                if obligatorio and var not in st.session_state.campos_obligatorios:
-                                    st.session_state.campos_obligatorios.append(var)
-                                
-                                if 'lista' in tipo or 'selección' in tipo:
-                                    opciones = [o.strip() for o in opts.split(';')] if ';' in opts else [opts]
-                                    opciones = ["Seleccionar..."] + opciones
-                                    v_actual = st.session_state.respuestas_encuesta.get(var, "Seleccionar...")
-                                    idx_act = opciones.index(v_actual) if v_actual in opciones else 0
-                                    
-                                    respuesta = st.selectbox("Seleccione:", opciones, index=idx_act, key=f"sel_{var}", label_visibility="collapsed")
-                                    st.session_state.respuestas_encuesta[var] = respuesta
-                                    
-                                elif 'numérico' in tipo:
-                                    v_actual = st.session_state.respuestas_encuesta.get(var, 0)
-                                    respuesta = st.number_input("Cantidad:", min_value=0, step=1, value=int(v_actual), key=f"num_{var}", label_visibility="collapsed")
-                                    st.session_state.respuestas_encuesta[var] = respuesta
-                                    
-                                else:
-                                    v_actual = st.session_state.respuestas_encuesta.get(var, "")
-                                    respuesta = st.text_input("Respuesta:", value=v_actual, key=f"txt_{var}", label_visibility="collapsed")
-                                    st.session_state.respuestas_encuesta[var] = respuesta
-                                    
-                                st.markdown("<br>", unsafe_allow_html=True)
-                                
-                    except Exception as e:
-                        st.error(f"Error cargando el bloque '{nombre_hoja}': {e}")
-
-                    # =====================================================================
-                    # BOTONES DE NAVEGACIÓN Y GUARDADO FINAL
-                    # =====================================================================
-                    st.markdown("---")
-                    col_nav_izq, col_nav_cen, col_nav_der = st.columns([1, 1, 1])
-                    
-                    with col_nav_izq:
-                        if st.session_state.paso_encuesta > 0:
-                            if st.button("⬅️ Anterior Módulo", use_container_width=True):
-                                st.session_state.paso_encuesta -= 1
-                                st.rerun()
-                                
-                    with col_nav_der:
-                        if st.session_state.paso_encuesta < len(hojas) - 1:
-                            if st.button("Siguiente Módulo ➡️", use_container_width=True):
-                                st.session_state.paso_encuesta += 1
-                                st.rerun()
+                        if 'lista' in t or 'selección' in t:
+                            opts = ["Seleccionar..."] + [x.strip() for x in o.split(';')] if ';' in o else ["Seleccionar...", o]
+                            curr = st.session_state.resp_enc.get(v, "Seleccionar...")
+                            st.session_state.resp_enc[v] = st.selectbox("Elija:", opts, index=opts.index(curr) if curr in opts else 0, key=f"s_{v}", label_visibility="collapsed")
+                        elif 'numérico' in t:
+                            curr = st.session_state.resp_enc.get(v, 0)
+                            st.session_state.resp_enc[v] = st.number_input("Cant:", min_value=0, step=1, value=int(curr), key=f"n_{v}", label_visibility="collapsed")
                         else:
-                            # Ajuste 4: Botón de finalizar solo visible en el último bloque
-                            if st.button("💾 Finalizar y Enviar Encuesta", use_container_width=True):
-                                faltan = [c for c in st.session_state.campos_obligatorios if not st.session_state.respuestas_encuesta.get(c) or str(st.session_state.respuestas_encuesta.get(c)).strip() == "" or str(st.session_state.respuestas_encuesta.get(c)) == "Seleccionar..."]
-                                
-                                if faltan:
-                                    st.error(f"⚠️ Faltan preguntas obligatorias (*). Navegue por los módulos para completarlas.")
-                                else:
-                                    # Ajuste 1: Registro de fecha y hora actual
-                                    fecha_registro = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                    
-                                    final_data = {
-                                        'FECHA_REGISTRO': fecha_registro,
-                                        'NOMBRE_DILIGENCIADOR': st.session_state.nombre_diligencia,
-                                        'EMAIL_VALIDADO': st.session_state.email_ingresado,
-                                        **st.session_state.datos_temporales,
-                                        **st.session_state.respuestas_encuesta
-                                    }
-                                    df_final = pd.DataFrame([final_data])
-                                    try:
-                                        df_final.to_csv('Consolidado_Encuestas_MEN.csv', mode='a', header=not pd.io.common.file_exists('Consolidado_Encuestas_MEN.csv'), index=False, encoding='utf-8-sig')
-                                        st.success("✅ ¡Encuesta procesada exitosamente! Gracias por su participación.")
-                                        st.balloons()
-                                        
-                                        # Limpiar sesión para permitir nueva captura si se desea
-                                        if st.button("Volver al Inicio para registrar otra institución"):
-                                            for key in list(st.session_state.keys()):
-                                                del st.session_state[key]
-                                            st.rerun()
-                                    except Exception as e:
-                                        st.error(f"Error al guardar: {e}")
+                            curr = st.session_state.resp_enc.get(v, "")
+                            st.session_state.resp_enc[v] = st.text_input("Resp:", value=curr, key=f"t_{v}", label_visibility="collapsed")
+                        st.write("")
+            except Exception as e:
+                st.error(f"Error en bloque: {e}")
 
-            else:
-                st.error("❌ El correo no se encuentra en la base maestra EE 2026. Por favor verifique.")
-                if st.button("Intentar con otro correo"):
-                    st.session_state.iniciado = False
-                    st.rerun()
+            st.markdown("---")
+            c_iz, c_de = st.columns(2)
+            with c_iz:
+                if st.session_state.paso_encuesta > 0:
+                    if st.button("⬅️ Anterior"):
+                        st.session_state.paso_encuesta -= 1
+                        st.rerun() # Ajuste 1: Forzar scroll al top
+            with c_de:
+                if st.session_state.paso_encuesta < len(hojas) - 1:
+                    if st.button("Siguiente ➡️"):
+                        st.session_state.paso_encuesta += 1
+                        st.rerun() # Ajuste 1: Forzar scroll al top
+                else:
+                    if st.button("💾 Finalizar y Enviar"):
+                        faltan = [c for c in st.session_state.oblig if not st.session_state.resp_enc.get(c) or str(st.session_state.resp_enc.get(c)) in ["","Seleccionar..."]]
+                        if faltan:
+                            st.error("⚠️ Faltan preguntas obligatorias (*).")
+                        else:
+                            final = {'FECHA': datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 'DILIGENCIADOR': st.session_state.nombre_diligencia, 'EMAIL_VALIDADO': st.session_state.email_ingresado, **st.session_state.datos_temporales, **st.session_state.resp_enc}
+                            pd.DataFrame([final]).to_csv('Consolidado_Encuestas_MEN.csv', mode='a', header=not pd.io.common.file_exists('Consolidado_Encuestas_MEN.csv'), index=False, encoding='utf-8-sig')
+                            st.session_state.finalizado = True
+                            st.rerun()
 
-        except Exception as e:
-            st.error(f"Error técnico conectando a la base: {e}")
+    else:
+        st.error("Correo no encontrado en base EE 2026.")
+        if st.button("Regresar"):
+            st.session_state.clear()
+            st.rerun()
 
 # =====================================================================
-# 4. PANEL DE ADMINISTRACIÓN (ACCESO RESTRINGIDO)
+# 5. PANEL DE ADMINISTRACIÓN INDEPENDIENTE (Ajuste 3)
 # =====================================================================
+st.markdown("<br><br>", unsafe_allow_html=True)
 st.markdown("---")
-st.subheader("🔒 Panel de Administración de Datos")
-clave_acceso = st.text_input("Ingrese la clave maestra para visualizar o descargar la base de datos consolidada:", type="password")
-
-if clave_acceso == "AdminMEN2026": 
-    with st.expander("Ver base de datos consolidada (Acceso Autorizado)", expanded=True):
-        try:
-            if pd.io.common.file_exists('Consolidado_Encuestas_MEN.csv'):
-                df_revisar = pd.read_csv('Consolidado_Encuestas_MEN.csv', encoding='utf-8-sig')
-                st.dataframe(df_revisar)
-                
-                csv = df_revisar.to_csv(index=False).encode('utf-8-sig')
-                st.download_button(
-                    label="📥 Descargar Base Completa (.csv)",
-                    data=csv,
-                    file_name='Consolidado_Encuestas_MEN.csv',
-                    mime='text/csv',
-                )
-            else:
-                st.info("Aún no hay encuestas registradas en la base de datos.")
-        except Exception as e:
-            st.error(f"No se pudo cargar la vista previa: {e}")
-elif clave_acceso != "":
-    st.error("❌ Clave incorrecta. Acceso denegado a la base de datos.")
+st.subheader("🔒 Panel de Control - Área Funcional")
+pw = st.text_input("Clave administrativa:", type="password")
+if pw == "AdminMEN2026":
+    if pd.io.common.file_exists('Consolidado_Encuestas_MEN.csv'):
+        df_v = pd.read_csv('Consolidado_Encuestas_MEN.csv', encoding='utf-8-sig')
+        st.write(f"Total registros: {len(df_v)}")
+        st.dataframe(df_v)
+        st.download_button("📥 Descargar Consolidado (.csv)", data=df_v.to_csv(index=False).encode('utf-8-sig'), file_name='Consolidado_Encuestas_MEN.csv', mime='text/csv')
+    else:
+        st.info("Sin registros aún.")
+elif pw != "":
+    st.error("Acceso denegado.")
