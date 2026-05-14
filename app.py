@@ -5,7 +5,8 @@ from datetime import datetime
 # =====================================================================
 # 1. CONFIGURACIÓN Y ESTILOS MEN
 # =====================================================================
-st.set_page_config(page_title="Encuesta Calidad MEN", layout="wide")
+# AJUSTE 1: Quitamos layout="wide" para que la encuesta quede centrada con márgenes
+st.set_page_config(page_title="Encuesta Calidad MEN", layout="centered")
 
 st.markdown("""
     <h1 style='font-family: Arial; font-size: 18pt; font-weight: bold; text-align: center;'>
@@ -16,6 +17,16 @@ st.markdown("""
     </h2>
     <hr>
 """, unsafe_allow_html=True)
+
+# AJUSTE 2: Función JavaScript para forzar el scroll a la parte superior
+def forzar_scroll_arriba():
+    js = '''
+    <script>
+        var body = window.parent.document.querySelector(".main");
+        if (body) { body.scrollTop = 0; }
+    </script>
+    '''
+    st.components.v1.html(js, height=0)
 
 # =====================================================================
 # 2. FUNCIONES DE CARGA Y LÓGICA DE NEGOCIO
@@ -43,24 +54,39 @@ def verificar_duplicidad(email):
     return False
 
 # =====================================================================
-# 3. GESTIÓN DE ESTADO DE SESIÓN
+# 3. GESTIÓN DE ESTADO DE SESIÓN Y CALLBACKS
 # =====================================================================
+hojas = ["Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "docentes"]
+
 if 'iniciado' not in st.session_state:
     st.session_state.iniciado = False
 if 'encuesta_iniciada' not in st.session_state:
     st.session_state.encuesta_iniciada = False
 if 'paso_encuesta' not in st.session_state:
     st.session_state.paso_encuesta = 0
+if 'nav_radio' not in st.session_state:
+    st.session_state.nav_radio = hojas[0]
 if 'editando' not in st.session_state:
     st.session_state.editando = False
 if 'finalizado' not in st.session_state:
     st.session_state.finalizado = False
 
+# Funciones de sincronización para botones y menú
+def avanzar_paso():
+    st.session_state.paso_encuesta += 1
+    st.session_state.nav_radio = hojas[st.session_state.paso_encuesta]
+
+def retroceder_paso():
+    st.session_state.paso_encuesta -= 1
+    st.session_state.nav_radio = hojas[st.session_state.paso_encuesta]
+
+def sincronizar_menu():
+    st.session_state.paso_encuesta = hojas.index(st.session_state.nav_radio)
+
 # =====================================================================
 # 4. FLUJO DE USUARIO (ENCUESTA)
 # =====================================================================
 
-# Pantalla de éxito final (Ajuste 2: Sin botón de repetir, solo reset al inicio)
 if st.session_state.finalizado:
     st.success("✅ ¡Encuesta procesada exitosamente! Gracias por su participación.")
     st.balloons()
@@ -69,7 +95,6 @@ if st.session_state.finalizado:
         st.rerun()
     st.stop()
 
-# Inicio de sesión
 if not st.session_state.iniciado:
     st.info("👋 Bienvenido. Ingrese los datos para acceder.")
     c1, c2 = st.columns(2)
@@ -96,7 +121,6 @@ else:
     if not res.empty:
         fila = res.iloc[0]
         
-        # Fase 1: Actualización de datos
         if not st.session_state.encuesta_iniciada:
             st.subheader("Fase 1: Verificación de Datos")
             bloq = not st.session_state.editando
@@ -133,13 +157,15 @@ else:
                         st.session_state.encuesta_iniciada = True
                         st.rerun()
 
-        # Fase 2: Bloques dinámicos
         else:
-            st.markdown("---")
-            hojas = ["Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "Docentes"]
+            # Forzamos el scroll al inicio al cambiar de bloque
+            forzar_scroll_arriba()
             
-            # Ajuste 1: Radio button para navegación (al cambiar, st.rerun() manda al top)
-            st.radio("Progreso:", hojas, index=st.session_state.paso_encuesta, horizontal=True, key="nav_radio")
+            st.markdown("---")
+            st.markdown("#### Progreso de la Encuesta")
+            
+            # Menú de navegación sincronizado
+            st.radio("Navegación:", hojas, horizontal=True, key="nav_radio", on_change=sincronizar_menu, label_visibility="collapsed")
             
             if 'resp_enc' not in st.session_state: st.session_state.resp_enc = {}
             if 'oblig' not in st.session_state: st.session_state.oblig = []
@@ -178,16 +204,14 @@ else:
             c_iz, c_de = st.columns(2)
             with c_iz:
                 if st.session_state.paso_encuesta > 0:
-                    if st.button("⬅️ Anterior"):
-                        st.session_state.paso_encuesta -= 1
-                        st.rerun() # Ajuste 1: Forzar scroll al top
+                    # Botón enlazado al callback
+                    st.button("⬅️ Anterior", on_click=retroceder_paso)
             with c_de:
                 if st.session_state.paso_encuesta < len(hojas) - 1:
-                    if st.button("Siguiente ➡️"):
-                        st.session_state.paso_encuesta += 1
-                        st.rerun() # Ajuste 1: Forzar scroll al top
+                    # Botón enlazado al callback
+                    st.button("Siguiente ➡️", on_click=avanzar_paso)
                 else:
-                    if st.button("💾 Finalizar y Enviar"):
+                    if st.button("💾 Finalizar y Enviar", use_container_width=True):
                         faltan = [c for c in st.session_state.oblig if not st.session_state.resp_enc.get(c) or str(st.session_state.resp_enc.get(c)) in ["","Seleccionar..."]]
                         if faltan:
                             st.error("⚠️ Faltan preguntas obligatorias (*).")
@@ -204,7 +228,7 @@ else:
             st.rerun()
 
 # =====================================================================
-# 5. PANEL DE ADMINISTRACIÓN INDEPENDIENTE (Ajuste 3)
+# 5. PANEL DE ADMINISTRACIÓN INDEPENDIENTE
 # =====================================================================
 st.markdown("<br><br>", unsafe_allow_html=True)
 st.markdown("---")
