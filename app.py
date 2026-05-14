@@ -7,7 +7,6 @@ from datetime import datetime
 # =====================================================================
 st.set_page_config(page_title="Encuesta Calidad MEN", layout="wide")
 
-# CSS para limitar el ancho y mejorar la estética
 st.markdown("""
     <style>
         .block-container {
@@ -24,10 +23,10 @@ st.markdown("""
 # =====================================================================
 # ENCABEZADO INSTITUCIONAL CON LOGO
 # =====================================================================
-col_logo, col_tit = st.columns([1, 4]) # Crea dos columnas (una pequeña para el logo y otra para el texto)
+col_logo, col_tit = st.columns([1, 4])
 
 with col_logo:
-    # Reemplaza "tu_imagen.png" por el nombre real de tu archivo de imagen
+    # Recuerda cambiar "tu_imagen.png" por el nombre de tu archivo de imagen
     st.image("logo_min.png", width=130) 
 
 with col_tit:
@@ -44,14 +43,13 @@ with col_tit:
 
 st.markdown("<hr>", unsafe_allow_html=True)
 
-# Función para forzar el scroll al inicio de la página
+# =====================================================================
+# 2. FUNCIONES DE CARGA Y LÓGICA
+# =====================================================================
 def scroll_al_inicio():
     js = "<script>window.parent.document.querySelector('.main').scrollTo(0,0);</script>"
     st.components.v1.html(js, height=0)
 
-# =====================================================================
-# 2. LÓGICA DE DATOS Y ESTADO
-# =====================================================================
 @st.cache_data
 def cargar_maestra():
     try:
@@ -70,7 +68,9 @@ def es_duplicado(email):
         except: return False
     return False
 
-# Inicialización de estados para no perder información
+# =====================================================================
+# 3. ESTADO DE MEMORIA (AQUÍ ESTABA EL ERROR CORREGIDO)
+# =====================================================================
 hojas = ["Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "docentes"]
 
 if 'iniciado' not in st.session_state: st.session_state.iniciado = False
@@ -79,21 +79,19 @@ if 'paso' not in st.session_state: st.session_state.paso = 0
 if 'editando' not in st.session_state: st.session_state.editando = False
 if 'finalizado' not in st.session_state: st.session_state.finalizado = False
 if 'resp_enc' not in st.session_state: st.session_state.resp_enc = {}
+if 'oblig' not in st.session_state: st.session_state.oblig = [] # <-- ¡Esta era la variable que faltaba!
 
 # =====================================================================
-# 3. FLUJO PRINCIPAL
+# 4. FLUJO PRINCIPAL
 # =====================================================================
-
-# Pantalla de éxito final
 if st.session_state.finalizado:
     st.success("✅ ¡Encuesta procesada exitosamente! Los datos han sido registrados en la base del Ministerio.")
     st.balloons()
-    if st.button("Finalizar Sesión"):
+    if st.button("Finalizar Sesión y Volver al Inicio"):
         st.session_state.clear()
         st.rerun()
     st.stop()
 
-# Acceso inicial
 if not st.session_state.iniciado:
     st.info("👋 Bienvenida/o. Ingrese los datos para validar su institución.")
     c1, c2 = st.columns(2)
@@ -158,10 +156,9 @@ else:
 
         # --- FASE 2: ENCUESTA ---
         else:
-            scroll_al_inicio() # Se ejecuta al cargar el bloque
+            scroll_al_inicio()
             st.markdown("### Fase 2: Diligenciamiento de Encuesta")
             
-            # Navegación Visual Sincronizada
             paso_actual = st.radio("Módulos:", hojas, index=st.session_state.paso, horizontal=True)
             if hojas.index(paso_actual) != st.session_state.paso:
                 st.session_state.paso = hojas.index(paso_actual)
@@ -169,6 +166,8 @@ else:
 
             hoja_act = hojas[st.session_state.paso]
             st.info(f"📍 Usted está en el bloque: **{hoja_act}**")
+            
+            obligatorios_hoja_actual = [] # Control local para el botón "Siguiente"
             
             try:
                 df_p = pd.read_excel("Encuesta_Calidad.xlsx", sheet_name=hoja_act, skiprows=2)
@@ -181,6 +180,13 @@ else:
                     
                     if p and p != 'nan':
                         st.write(f"**{p}** {'(*)' if ob else ''}")
+                        
+                        # Guardamos en las listas de control
+                        if ob:
+                            obligatorios_hoja_actual.append(v)
+                            if v not in st.session_state.oblig:
+                                st.session_state.oblig.append(v)
+                                
                         if 'lista' in t or 'selección' in t:
                             opts = ["Seleccionar..."] + [x.strip() for x in o.split(';')] if ';' in o else ["Seleccionar...", o]
                             curr = st.session_state.resp_enc.get(v, "Seleccionar...")
@@ -195,6 +201,7 @@ else:
             except Exception as e:
                 st.error(f"Error al cargar las preguntas: {e}")
 
+            # --- BOTONES DE NAVEGACIÓN Y VALIDACIÓN ---
             st.markdown("---")
             c_iz, c_de = st.columns(2)
             with c_iz:
@@ -205,22 +212,31 @@ else:
             with c_de:
                 if st.session_state.paso < len(hojas) - 1:
                     if st.button("Siguiente Bloque ➡️"):
-                        st.session_state.paso += 1
-                        st.rerun()
+                        # Valida solo la pestaña en la que estás
+                        faltan = [c for c in obligatorios_hoja_actual if not st.session_state.resp_enc.get(c) or str(st.session_state.resp_enc.get(c)).strip() in ["", "Seleccionar..."]]
+                        if faltan:
+                            st.error("⚠️ Por favor responda todas las preguntas obligatorias (*) de este bloque antes de continuar.")
+                        else:
+                            st.session_state.paso += 1
+                            st.rerun()
                 else:
                     if st.button("💾 FINALIZAR Y ENVIAR ENCUESTA"):
-                        # Validación de obligatorios simplificada
-                        fecha_f = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        final = {'FECHA': fecha_f, 'DILIGENCIADOR': st.session_state.nombre_diligencia, 'EMAIL_VALIDADO': st.session_state.email_ingresado, **st.session_state.datos_temp, **st.session_state.resp_enc}
-                        pd.DataFrame([final]).to_csv('Consolidado_Encuestas_MEN.csv', mode='a', header=not pd.io.common.file_exists('Consolidado_Encuestas_MEN.csv'), index=False, encoding='utf-8-sig')
-                        st.session_state.finalizado = True
-                        st.rerun()
+                        # Doble validación final de TODO el documento
+                        faltan_totales = [c for c in st.session_state.oblig if not st.session_state.resp_enc.get(c) or str(st.session_state.resp_enc.get(c)).strip() in ["", "Seleccionar..."]]
+                        if faltan_totales:
+                            st.error("⚠️ Faltan preguntas obligatorias (*) en otros bloques. Revise la navegación arriba.")
+                        else:
+                            fecha_f = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            final = {'FECHA': fecha_f, 'DILIGENCIADOR': st.session_state.nombre_diligencia, 'EMAIL_VALIDADO': st.session_state.email_ingresado, **st.session_state.datos_temp, **st.session_state.resp_enc}
+                            pd.DataFrame([final]).to_csv('Consolidado_Encuestas_MEN.csv', mode='a', header=not pd.io.common.file_exists('Consolidado_Encuestas_MEN.csv'), index=False, encoding='utf-8-sig')
+                            st.session_state.finalizado = True
+                            st.rerun()
     else:
         st.error("Correo no registrado. Por favor verifique.")
         if st.button("Reintentar"): st.session_state.clear(); st.rerun()
 
 # =====================================================================
-# 4. PANEL DE CONTROL (SIEMPRE ACCESIBLE AL FINAL)
+# 5. PANEL DE ADMINISTRACIÓN
 # =====================================================================
 st.markdown("<br><br><br>", unsafe_allow_html=True)
 with st.expander("🔐 Panel de Administración (Uso Interno)"):
