@@ -28,15 +28,14 @@ col_logo, col_tit = st.columns([1, 4]) # Crea dos columnas (una pequeña para el
 
 with col_logo:
     # Reemplaza "tu_imagen.png" por el nombre real de tu archivo de imagen
-    st.image("logo_min.png", width=130) 
+    st.image("logo_min.png", width=150) 
 
 with col_tit:
     st.markdown("""
         <div style='text-align: left;'>
             <h1 style='font-family: Arial; font-size: 18pt; font-weight: bold; margin-bottom: 0;'>
                 Ministerio de Educación Nacional
-            </h1>
-            <h2 style='font-family: Arial; font-size: 14pt; font-weight: bold; color: #333;'>
+            <h2 style='font-family: Arial; font-size: 14pt; font-weight: bold; color: #444444;'>
                 Encuesta de Calidad en la Información
             </h2>
         </div>
