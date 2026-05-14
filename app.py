@@ -94,7 +94,7 @@ if st.session_state.finalizado:
 
 # Acceso inicial
 if not st.session_state.iniciado:
-    st.info("👋 Bienvenida/o. Ingrese los datos para validar su institución.")
+    st.info("👋 Bienvenida/o. Para nosotros es muy importante esta actividad y contamos con toda su colaboracion por favor iniciemos Ingresando los datos para validar su institución.")
     c1, c2 = st.columns(2)
     with c1: email_t = st.text_input("Correo electrónico institucional:")
     with c2: nombre_t = st.text_input("Nombre de quien diligencia:")
