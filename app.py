@@ -71,7 +71,7 @@ def es_duplicado(email):
 # =====================================================================
 # 3. ESTADO DE MEMORIA (AQUÍ ESTABA EL ERROR CORREGIDO)
 # =====================================================================
-hojas = ["Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "docentes"]
+hojas = ["Infraestructura", "Computadores", "Recursos Pedagógicos", "Programas", "Docentes"]
 
 if 'iniciado' not in st.session_state: st.session_state.iniciado = False
 if 'encuesta_iniciada' not in st.session_state: st.session_state.encuesta_iniciada = False
@@ -94,7 +94,7 @@ if st.session_state.finalizado:
 
 if not st.session_state.iniciado:
     st.info("Estimado(a) rector(a): " \
-    "Su voz y conocimiento del establecimiento educativo son fundamentales para construir una mirada real y contextualizada sobre la calidad educativa en Colombia." \
+    "Su voz y conocimiento de l establecimiento educativo son fundamentales para construir una mirada real y contextualizada sobre la calidad educativa en Colombia." \
     "El diligenciamiento de esta encuesta permitirá contar con información valiosa para reconocer las condiciones en las que se desarrollan los procesos pedagógicos, identificar necesidades prioritarias y fortalecer la toma de decisiones orientadas al mejoramiento educativo.Cada respuesta contribuirá a visibilizar los avances, retos y capacidades de su institución, y será un insumo clave para continuar promoviendo una educación integral, pertinente, incluyente y de calidad para todos los estudiantes." \
     "Cada respuesta contribuirá a visibilizar los avances, retos y capacidades de su institución, y será un insumo clave para continuar promoviendo una educación integral, pertinente, incluyente y de calidad para todos los estudiantes." \
     "Agradecemos profundamente su tiempo, disposición y compromiso con la educación del país.")
