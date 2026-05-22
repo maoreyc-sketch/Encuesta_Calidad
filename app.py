@@ -36,7 +36,7 @@ with col_tit:
                 Ministerio de Educación Nacional
             </h1>
             <h2 style='font-family: Arial; font-size: 16pt; font-weight: bold; color: #4E1F79;'>
-                Encuesta de Calidad en la Información
+                Indice Integral de Calidad Educativa
             </h2>
         </div>
     """, unsafe_allow_html=True)
@@ -93,7 +93,11 @@ if st.session_state.finalizado:
     st.stop()
 
 if not st.session_state.iniciado:
-    st.info("👋 Bienvenida/o. Ingrese los datos para validar su institución.")
+    st.info("Estimado(a) rector(a): " \
+    "Su voz y conocimiento del establecimiento educativo son fundamentales para construir una mirada real y contextualizada sobre la calidad educativa en Colombia." \
+    "El diligenciamiento de esta encuesta permitirá contar con información valiosa para reconocer las condiciones en las que se desarrollan los procesos pedagógicos, identificar necesidades prioritarias y fortalecer la toma de decisiones orientadas al mejoramiento educativo.Cada respuesta contribuirá a visibilizar los avances, retos y capacidades de su institución, y será un insumo clave para continuar promoviendo una educación integral, pertinente, incluyente y de calidad para todos los estudiantes." \
+    "Cada respuesta contribuirá a visibilizar los avances, retos y capacidades de su institución, y será un insumo clave para continuar promoviendo una educación integral, pertinente, incluyente y de calidad para todos los estudiantes." \
+    "Agradecemos profundamente su tiempo, disposición y compromiso con la educación del país.")
     c1, c2 = st.columns(2)
     with c1: email_t = st.text_input("Correo electrónico institucional:")
     with c2: nombre_t = st.text_input("Nombre de quien diligencia:")
