@@ -302,10 +302,9 @@ def generar_excel(df, df_maestra):
             avance['Recibidas'] = avance['Recibidas'].astype(int)
             avance['Pendientes'] = avance['Esperadas'] - avance['Recibidas']
             avance['Pct'] = (avance['Recibidas'] / avance['Esperadas'] * 100).round(1)
-            avance = avance.sort_values('Pct', ascending=False)
+            avance = avance.sort_values('Pct', ascending=False).reset_index(drop=True)
 
-            for ri, row in avance.iterrows():
-                fila_num = ri - avance.index[0] + 3
+            for fila_num, (_, row) in enumerate(avance.iterrows(), start=3):
                 pct = float(row['Pct'])
                 estado = "✅ Completo" if pct >= 100 else ("🟡 En progreso" if pct >= 50 else "🔴 Crítico")
                 fill_estado = (PatternFill("solid", fgColor=VERDE) if pct >= 100
