@@ -458,6 +458,7 @@ if 'finalizado'        not in st.session_state: st.session_state.finalizado     
 if 'resp_enc'          not in st.session_state: st.session_state.resp_enc          = {}
 if 'oblig'             not in st.session_state: st.session_state.oblig             = []
 if 'panel_admin'       not in st.session_state: st.session_state.panel_admin       = False
+if 'hacer_scroll'      not in st.session_state: st.session_state.hacer_scroll      = False
 
 # =====================================================================
 # PANEL DE ADMINISTRACIÓN (pantalla completa)
@@ -723,6 +724,10 @@ else:
         # --- FASE 2: ENCUESTA ---
         else:
             scroll_al_inicio()
+            # Scroll automático al cambiar de bloque
+            if st.session_state.hacer_scroll:
+                scroll_al_inicio()
+                st.session_state.hacer_scroll = False
             st.markdown("### Fase 2: Diligenciamiento de Encuesta")
 
             paso_actual = st.radio("Módulos:", hojas, index=st.session_state.paso, horizontal=True)
@@ -774,7 +779,9 @@ else:
             with c_iz:
                 if st.session_state.paso > 0:
                     if st.button("⬅️ Bloque Anterior"):
-                        st.session_state.paso -= 1; st.rerun()
+                        st.session_state.paso -= 1
+                        st.session_state.hacer_scroll = True
+                        st.rerun()
             with c_de:
                 if st.session_state.paso < len(hojas) - 1:
                     if st.button("Siguiente Bloque ➡️"):
@@ -784,7 +791,9 @@ else:
                         if faltan:
                             st.error("⚠️ Por favor responda todas las preguntas obligatorias (*) de este bloque.")
                         else:
-                            st.session_state.paso += 1; st.rerun()
+                            st.session_state.paso += 1
+                            st.session_state.hacer_scroll = True
+                            st.rerun()
                 else:
                     if st.button("💾 FINALIZAR Y ENVIAR ENCUESTA"):
                         faltan_tot = [c for c in st.session_state.oblig
