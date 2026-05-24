@@ -554,7 +554,7 @@ def mostrar_panel_admin():
                     return 'background-color:#f8d7da;color:#721c24'
                 return ''
 
-            st.dataframe(avance.style.applymap(colorear_pct, subset=['% Avance']),
+            st.dataframe(avance.style.map(colorear_pct, subset=['% Avance']),
                          use_container_width=True, hide_index=True)
             st.bar_chart(avance.set_index('Departamento')['% Avance'])
         else:
