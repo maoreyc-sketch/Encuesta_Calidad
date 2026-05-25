@@ -60,9 +60,13 @@ _gh_disponible = (
 )
 
 def _gh_headers():
+    tk = st.secrets["github_token"]
+    # ghp_ = clasico (token), github_pat_ = fine-grained (Bearer)
+    prefijo = "Bearer" if tk.startswith("github_pat_") else "token"
     return {
-        "Authorization": f"token {st.secrets['github_token']}",
-        "Accept": "application/vnd.github.v3+json"
+        "Authorization": f"{prefijo} {tk}",
+        "Accept": "application/vnd.github.v3+json",
+        "X-GitHub-Api-Version": "2022-11-28"
     }
 
 def _gh_url():
