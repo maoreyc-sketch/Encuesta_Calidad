@@ -467,12 +467,62 @@ def mostrar_panel_admin():
     st.markdown("## 📊 Panel de Administración — Encuesta Calidad MEN")
 
     # Indicador de almacenamiento activo
-    if _gh_disponible:
-        st.success("🔒 Almacenamiento activo: **GitHub** — los datos están seguros y no se perderán.")
-    else:
-        st.warning("⚠️ Almacenamiento: **CSV local** — configura GitHub en Secrets para persistencia total.")
+    # ── Diagnóstico REAL de almacenamiento ──────────────────────────
+    csv_local_existe = os.path.exists(CSV_PATH)
 
-    st.markdown("<hr>", unsafe_allow_html=True)
+    if _gh_disponible:
+        # Verificar que GitHub realmente responde y tiene el archivo
+        df_gh, sha_gh = cargar_desde_github()
+        gh_tiene_datos = not df_gh.empty
+        if gh_tiene_datos:
+            st.success(f"🔒 **GitHub activo y verificado** — {len(df_gh)} registros confirmados en el repositorio.")
+        else:
+            st.error(
+                "⚠️ **GitHub configurado pero SIN datos confirmados.** "
+                "Los secrets existen pero la escritura no ha llegado al repositorio. "
+                "Los registros actuales están solo en el servidor temporal de Streamlit."
+            )
+            if csv_local_existe:
+                st.info("📁 Se encontró CSV local en el servidor. Usa el botón de rescate para sincronizarlo con GitHub.")
+                if st.button("🔄 Rescatar CSV local → subir a GitHub ahora"):
+                    df_rescate = pd.read_csv(CSV_PATH, encoding='utf-8-sig', on_bad_lines='skip')
+                    ok, err = guardar_en_github(df_rescate)
+                    if ok:
+                        st.success("✅ ¡Datos sincronizados con GitHub correctamente!")
+                        st.rerun()
+                    else:
+                        st.error(f"Error al subir: {err}. Verifica que el token tenga permisos de escritura (scope: repo).")
+    else:
+        st.warning("⚠️ GitHub no configurado — datos solo en CSV local (se pierden al reiniciar).")
+
+    st.markdown("---")
+
+    # ── Botón limpiar registros de prueba ───────────────────────────
+    with st.expander("🧹 Limpiar registros de prueba (usar antes de publicar)"):
+        st.warning("⚠️ Esto borrará TODOS los registros actuales. Úsalo solo para limpiar pruebas antes del lanzamiento real.")
+        confirmar = st.checkbox("Confirmo que quiero eliminar todos los registros de prueba")
+        if confirmar:
+            if st.button("🗑️ Eliminar todos los registros ahora", type="primary"):
+                # Borrar CSV local
+                if os.path.exists(CSV_PATH):
+                    os.remove(CSV_PATH)
+                # Borrar de GitHub si existe
+                if _gh_disponible:
+                    try:
+                        url, branch = _gh_url()
+                        _, sha_del = cargar_desde_github()
+                        if sha_del:
+                            requests.delete(url, headers=_gh_headers(), json={
+                                "message": "Limpieza registros de prueba",
+                                "sha": sha_del,
+                                "branch": branch
+                            }, timeout=10)
+                    except:
+                        pass
+                st.success("✅ Registros eliminados. La base está limpia para encuestas reales.")
+                st.rerun()
+
+    st.markdown("---")
 
     df         = leer_datos()
     df_maestra = cargar_maestra()
