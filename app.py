@@ -704,33 +704,59 @@ if st.session_state.finalizado:
 if not st.session_state.iniciado:
     st.info(
         "Estimado(a) rector(a): "
-        ""
         "Su voz y conocimiento del establecimiento educativo son fundamentales para construir una mirada real y contextualizada sobre la calidad educativa en Colombia. "
-        ""
         "El diligenciamiento de esta encuesta permitirá contar con información valiosa para reconocer las condiciones en las que se desarrollan los procesos pedagógicos, identificar necesidades prioritarias y fortalecer la toma de decisiones orientadas al mejoramiento educativo. "
-        ""
         "Cada respuesta contribuirá a visibilizar los avances, retos y capacidades de su institución, y será un insumo clave para continuar promoviendo una educación integral, pertinente, incluyente y de calidad para todos los estudiantes. "
-        ""
         "Agradecemos profundamente su tiempo, disposición y compromiso con la educación del país."
     )
-    c1, c2 = st.columns(2)
-    with c1:
-        email_t = st.text_input("Correo electrónico institucional:")
-    with c2:
-        nombre_t = st.text_input("Nombre de quien diligencia:")
+    df_login = cargar_maestra()
 
-    if st.button("🚀 Iniciar Proceso", use_container_width=True):
-        if email_t and nombre_t:
-            email_clean = email_t.strip().lower()
-            if es_duplicado(email_clean):
-                st.error("❌ Esta institución ya cuenta con un registro en el sistema.")
+    if df_login.empty:
+        st.error("⚠️ No se pudo cargar la base de establecimientos. Verifique el archivo EE 2026.xlsx.")
+    else:
+        # ── Filtro 1: Departamento ───────────────────────────────────
+        col_dep = 'DEPARTAMENTO' if 'DEPARTAMENTO' in df_login.columns else df_login.columns[0]
+        departamentos = ["Seleccionar..."] + sorted(df_login[col_dep].dropna().unique().tolist())
+
+        c1, c2 = st.columns(2)
+        with c1:
+            depto_sel = st.selectbox("📍 Seleccione el Departamento:", departamentos, key="sel_depto")
+
+        # ── Filtro 2: Colegio (cascading) ────────────────────────────
+        col_nom = 'NOMBRE_ESTABLECIMIENTO' if 'NOMBRE_ESTABLECIMIENTO' in df_login.columns else df_login.columns[1]
+
+        with c2:
+            if depto_sel != "Seleccionar...":
+                colegios_filtrados = df_login[df_login[col_dep] == depto_sel]
+                nombres = ["Seleccionar..."] + sorted(colegios_filtrados[col_nom].dropna().unique().tolist())
+                colegio_sel = st.selectbox("🏫 Seleccione el Establecimiento Educativo:", nombres, key="sel_colegio")
             else:
-                st.session_state.email_ingresado   = email_clean
-                st.session_state.nombre_diligencia = nombre_t.strip()
-                st.session_state.iniciado          = True
-                st.rerun()
-        else:
-            st.warning("Por favor complete ambos campos.")
+                st.selectbox("🏫 Seleccione el Establecimiento Educativo:",
+                             ["Seleccione primero el Departamento"], disabled=True, key="sel_colegio_dis")
+                colegio_sel = "Seleccionar..."
+
+        if st.button("🚀 Iniciar Proceso", use_container_width=True):
+            if depto_sel == "Seleccionar..." or colegio_sel == "Seleccionar...":
+                st.warning("⚠️ Por favor seleccione el Departamento y el Establecimiento Educativo.")
+            else:
+                # Obtener el registro del colegio seleccionado
+                fila_sel = df_login[
+                    (df_login[col_dep] == depto_sel) &
+                    (df_login[col_nom] == colegio_sel)
+                ].iloc[0]
+
+                email_clean = str(fila_sel.get('EMAIL', '')).strip().lower()
+                rector_nombre = str(fila_sel.get('RECTOR', colegio_sel)).strip()
+
+                if not email_clean or email_clean == 'nan':
+                    st.error("❌ Este establecimiento no tiene correo registrado. Contacte al administrador.")
+                elif es_duplicado(email_clean):
+                    st.error("❌ Esta institución ya cuenta con un registro en el sistema.")
+                else:
+                    st.session_state.email_ingresado   = email_clean
+                    st.session_state.nombre_diligencia = rector_nombre
+                    st.session_state.iniciado          = True
+                    st.rerun()
 
 else:
     df_ee = cargar_maestra()
