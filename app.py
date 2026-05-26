@@ -129,6 +129,15 @@ def es_duplicado(email):
         return False
     return email in df['EMAIL_VALIDADO'].str.strip().str.lower().values
 
+def es_duplicado_dane(codigo_dane):
+    """Verifica duplicado por Código DANE (más robusto que por email)."""
+    if not codigo_dane:
+        return False
+    df = leer_datos()
+    if df.empty or 'DANE' not in df.columns:
+        return False
+    return codigo_dane in df['DANE'].astype(str).str.strip().values
+
 def guardar_encuesta(final):
     """
     1. Lee todos los registros actuales.
@@ -463,6 +472,7 @@ if 'resp_enc'          not in st.session_state: st.session_state.resp_enc       
 if 'oblig'             not in st.session_state: st.session_state.oblig             = []
 if 'panel_admin'       not in st.session_state: st.session_state.panel_admin       = False
 if 'hacer_scroll'      not in st.session_state: st.session_state.hacer_scroll      = False
+if 'codigo_dane_sel'   not in st.session_state: st.session_state.codigo_dane_sel   = ''
 
 # =====================================================================
 # PANEL DE ADMINISTRACIÓN (pantalla completa)
@@ -739,28 +749,20 @@ if not st.session_state.iniciado:
             if depto_sel == "Seleccionar..." or colegio_sel == "Seleccionar...":
                 st.warning("⚠️ Por favor seleccione el Departamento y el Establecimiento Educativo.")
             else:
-                # Obtener el registro del colegio seleccionado
-                fila_sel = df_login[
-                    (df_login[col_dep] == depto_sel) &
-                    (df_login[col_nom] == colegio_sel)
-                ].iloc[0]
-
-                email_clean = str(fila_sel.get('EMAIL', '')).strip().lower()
+                fila_sel      = df_login[(df_login[col_dep] == depto_sel) & (df_login[col_nom] == colegio_sel)].iloc[0]
+                dane_sel      = str(fila_sel.get('CODIGO_DANE', '')).strip()
                 rector_nombre = str(fila_sel.get('RECTOR', colegio_sel)).strip()
-
-                if not email_clean or email_clean == 'nan':
-                    st.error("❌ Este establecimiento no tiene correo registrado. Contacte al administrador.")
-                elif es_duplicado(email_clean):
+                if es_duplicado_dane(dane_sel):
                     st.error("❌ Esta institución ya cuenta con un registro en el sistema.")
                 else:
-                    st.session_state.email_ingresado   = email_clean
+                    st.session_state.codigo_dane_sel   = dane_sel
                     st.session_state.nombre_diligencia = rector_nombre
                     st.session_state.iniciado          = True
                     st.rerun()
 
 else:
     df_ee = cargar_maestra()
-    res   = df_ee[df_ee['EMAIL'] == st.session_state.email_ingresado]
+    res   = df_ee[df_ee['CODIGO_DANE'].astype(str).str.strip() == st.session_state.codigo_dane_sel]
 
     if not res.empty:
         fila = res.iloc[0]
@@ -779,14 +781,16 @@ else:
                 dan_n = st.text_input("Código DANE Nuevo (Si aplica)", value="",                                    disabled=bloq)
             with col_b:
                 rec   = st.text_input("Rector",                        value=fila.get('RECTOR',''),                 disabled=bloq)
+                email_f = st.text_input("Correo Electrónico",          value=fila.get('EMAIL',''),                  disabled=bloq)
                 dir_e = st.text_input("Dirección",                     value=fila.get('DIRECCION',''),              disabled=bloq)
                 bar   = st.text_input("Barrio / Vereda",               value=fila.get('BARRIO_VEREDA',''),          disabled=bloq)
                 tel   = st.text_input("Teléfono",                      value=fila.get('TELEFONO',''),               disabled=bloq)
-                obs   = st.text_area("Observaciones",                  value="",                                    disabled=bloq, height=68)
+                obs   = st.text_area("Observaciones",                  value="",                                    disabled=bloq, height=55)
 
             def datos_actuales():
                 return {'NOMBRE': nom, 'DANE': dan, 'DEPTO': dep, 'MUNI': mun,
-                        'RECTOR': rec, 'DIR': dir_e, 'BARRIO': bar, 'TEL': tel,
+                        'RECTOR': rec, 'EMAIL_VALIDADO': email_f.strip().lower(),
+                        'DIR': dir_e, 'BARRIO': bar, 'TEL': tel,
                         'DANE_N': dan_n, 'OBS': obs}
 
             ca, cb = st.columns(2)
@@ -888,9 +892,8 @@ else:
                         else:
                             fecha_f = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             final = {
-                                'FECHA':          fecha_f,
-                                'DILIGENCIADOR':  st.session_state.nombre_diligencia,
-                                'EMAIL_VALIDADO': st.session_state.email_ingresado,
+                                'FECHA':         fecha_f,
+                                'DILIGENCIADOR': st.session_state.nombre_diligencia,
                                 **st.session_state.datos_temp,
                                 **st.session_state.resp_enc
                             }
