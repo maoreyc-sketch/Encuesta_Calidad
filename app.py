@@ -591,26 +591,27 @@ def mostrar_panel_admin():
 
     # ── Tabs de visualización web ────────────────────────────────────
     tab1, tab2, tab3, tab4 = st.tabs([
-        "📊 Avance por Departamento",
+        "📊 Avance por Secretaria",
         "🏫 Establecimientos Pendientes",
         "📋 Ver Todas las Respuestas",
         "⬇️ Otras Descargas"
     ])
 
-    # ── TAB 1: Avance por departamento ──────────────────────────────
+    # ── TAB 1: Avance por Secretaria ────────────────────────────────
     with tab1:
-        col_dep_m = 'DEPARTAMENTO' if not df_maestra.empty and 'DEPARTAMENTO' in df_maestra.columns else None
-        col_dep_r = 'DEPTO'        if 'DEPTO' in df.columns else None
+        col_sec_m = 'SECRETARIA' if not df_maestra.empty and 'SECRETARIA' in df_maestra.columns else None
+        col_sec_r = 'MUNI'       if 'MUNI' in df.columns else None
 
-        if col_dep_m and col_dep_r:
-            esp = df_maestra.groupby(col_dep_m).size().reset_index(name='Esperadas')
-            rec = df.groupby(col_dep_r).size().reset_index(name='Recibidas')
-            rec.rename(columns={col_dep_r: col_dep_m}, inplace=True)
-            avance = esp.merge(rec, on=col_dep_m, how='left').fillna(0)
+        if col_sec_m and col_sec_r:
+            esp = df_maestra.groupby(col_sec_m).size().reset_index(name='Esperadas')
+            rec = df.groupby(col_sec_r).size().reset_index(name='Recibidas')
+            rec.rename(columns={col_sec_r: col_sec_m}, inplace=True)
+            avance = esp.merge(rec, on=col_sec_m, how='left').fillna(0)
             avance['Recibidas']  = avance['Recibidas'].astype(int)
             avance['Pendientes'] = avance['Esperadas'] - avance['Recibidas']
             avance['% Avance']   = (avance['Recibidas'] / avance['Esperadas'] * 100).round(1)
-            avance = avance.sort_values('% Avance', ascending=False).rename(columns={col_dep_m: 'Departamento'})
+            avance = avance.sort_values('% Avance', ascending=False).reset_index(drop=True)
+            avance = avance.rename(columns={col_sec_m: 'Secretaría'})
 
             def colorear_pct(val):
                 if isinstance(val, float):
@@ -621,9 +622,9 @@ def mostrar_panel_admin():
 
             st.dataframe(avance.style.map(colorear_pct, subset=['% Avance']),
                          use_container_width=True, hide_index=True)
-            st.bar_chart(avance.set_index('Departamento')['% Avance'])
+            st.bar_chart(avance.set_index('Secretaría')['% Avance'])
         else:
-            st.info("Sin datos suficientes para calcular avance por departamento.")
+            st.info("Sin datos suficientes para calcular avance por Secretaría.")
 
     # ── TAB 2: Pendientes ───────────────────────────────────────────
     with tab2:
@@ -728,13 +729,11 @@ if not st.session_state.iniciado:
         col_dep = 'DEPARTAMENTO' if 'DEPARTAMENTO' in df_login.columns else df_login.columns[0]
         departamentos = ["Seleccionar..."] + sorted(df_login[col_dep].dropna().unique().tolist())
 
+        col_nom = 'NOMBRE_ESTABLECIMIENTO' if 'NOMBRE_ESTABLECIMIENTO' in df_login.columns else df_login.columns[1]
+
         c1, c2 = st.columns(2)
         with c1:
             depto_sel = st.selectbox("📍 Seleccione el Departamento:", departamentos, key="sel_depto")
-
-        # ── Filtro 2: Colegio (cascading) ────────────────────────────
-        col_nom = 'NOMBRE_ESTABLECIMIENTO' if 'NOMBRE_ESTABLECIMIENTO' in df_login.columns else df_login.columns[1]
-
         with c2:
             if depto_sel != "Seleccionar...":
                 colegios_filtrados = df_login[df_login[col_dep] == depto_sel]
@@ -745,18 +744,26 @@ if not st.session_state.iniciado:
                              ["Seleccione primero el Departamento"], disabled=True, key="sel_colegio_dis")
                 colegio_sel = "Seleccionar..."
 
+        # ── Campo: quien diligencia ──────────────────────────────────
+        nombre_diligencia = st.text_input(
+            "👤 Nombre de quien diligencia la encuesta:",
+            placeholder="Escriba su nombre completo (rector u otro delegado)",
+            key="nombre_dilig_login"
+        )
+
         if st.button("🚀 Iniciar Proceso", use_container_width=True):
             if depto_sel == "Seleccionar..." or colegio_sel == "Seleccionar...":
                 st.warning("⚠️ Por favor seleccione el Departamento y el Establecimiento Educativo.")
+            elif not nombre_diligencia.strip():
+                st.warning("⚠️ Por favor ingrese el nombre de quien diligencia la encuesta.")
             else:
-                fila_sel      = df_login[(df_login[col_dep] == depto_sel) & (df_login[col_nom] == colegio_sel)].iloc[0]
-                dane_sel      = str(fila_sel.get('CODIGO_DANE', '')).strip()
-                rector_nombre = str(fila_sel.get('RECTOR', colegio_sel)).strip()
+                fila_sel  = df_login[(df_login[col_dep] == depto_sel) & (df_login[col_nom] == colegio_sel)].iloc[0]
+                dane_sel  = str(fila_sel.get('CODIGO_DANE', '')).strip()
                 if es_duplicado_dane(dane_sel):
                     st.error("❌ Esta institución ya cuenta con un registro en el sistema.")
                 else:
                     st.session_state.codigo_dane_sel   = dane_sel
-                    st.session_state.nombre_diligencia = rector_nombre
+                    st.session_state.nombre_diligencia = nombre_diligencia.strip()
                     st.session_state.iniciado          = True
                     st.rerun()
 
