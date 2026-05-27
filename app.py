@@ -725,24 +725,40 @@ if not st.session_state.iniciado:
     if df_login.empty:
         st.error("⚠️ No se pudo cargar la base de establecimientos. Verifique el archivo EE 2026.xlsx.")
     else:
-        # ── Filtro 1: Departamento ───────────────────────────────────
-        col_dep = 'DEPARTAMENTO' if 'DEPARTAMENTO' in df_login.columns else df_login.columns[0]
-        departamentos = ["Seleccionar..."] + sorted(df_login[col_dep].dropna().unique().tolist())
-
+        # ── Columnas de referencia ───────────────────────────────────
+        col_dep = 'DEPARTAMENTO'          if 'DEPARTAMENTO'          in df_login.columns else df_login.columns[0]
+        col_mun = 'SECRETARIA'            if 'SECRETARIA'            in df_login.columns else None
         col_nom = 'NOMBRE_ESTABLECIMIENTO' if 'NOMBRE_ESTABLECIMIENTO' in df_login.columns else df_login.columns[1]
 
+        # ── Filtro 1: Departamento ───────────────────────────────────
         c1, c2 = st.columns(2)
         with c1:
-            depto_sel = st.selectbox("📍 Seleccione el Departamento:", departamentos, key="sel_depto")
+            departamentos = ["Seleccionar..."] + sorted(df_login[col_dep].dropna().unique().tolist())
+            depto_sel = st.selectbox("📍 Departamento:", departamentos, key="sel_depto")
+
+        # ── Filtro 2: Municipio (filtrado por departamento) ──────────
         with c2:
-            if depto_sel != "Seleccionar...":
-                colegios_filtrados = df_login[df_login[col_dep] == depto_sel]
-                nombres = ["Seleccionar..."] + sorted(colegios_filtrados[col_nom].dropna().unique().tolist())
-                colegio_sel = st.selectbox("🏫 Seleccione el Establecimiento Educativo:", nombres, key="sel_colegio")
+            if depto_sel != "Seleccionar..." and col_mun:
+                df_por_depto  = df_login[df_login[col_dep] == depto_sel]
+                municipios    = ["Seleccionar..."] + sorted(df_por_depto[col_mun].dropna().unique().tolist())
+                municipio_sel = st.selectbox("🏙️ Municipio / Secretaría:", municipios, key="sel_municipio")
             else:
-                st.selectbox("🏫 Seleccione el Establecimiento Educativo:",
-                             ["Seleccione primero el Departamento"], disabled=True, key="sel_colegio_dis")
-                colegio_sel = "Seleccionar..."
+                st.selectbox("🏙️ Municipio / Secretaría:",
+                             ["Seleccione primero el Departamento"], disabled=True, key="sel_mun_dis")
+                municipio_sel = "Seleccionar..."
+
+        # ── Filtro 3: Colegio (filtrado por municipio) ───────────────
+        if depto_sel != "Seleccionar..." and municipio_sel != "Seleccionar...":
+            df_por_mun  = df_login[
+                (df_login[col_dep] == depto_sel) &
+                (df_login[col_mun] == municipio_sel)
+            ]
+            nombres     = ["Seleccionar..."] + sorted(df_por_mun[col_nom].dropna().unique().tolist())
+            colegio_sel = st.selectbox("🏫 Establecimiento Educativo:", nombres, key="sel_colegio")
+        else:
+            st.selectbox("🏫 Establecimiento Educativo:",
+                         ["Seleccione primero el Municipio"], disabled=True, key="sel_col_dis")
+            colegio_sel = "Seleccionar..."
 
         # ── Campo: quien diligencia ──────────────────────────────────
         nombre_diligencia = st.text_input(
@@ -752,13 +768,17 @@ if not st.session_state.iniciado:
         )
 
         if st.button("🚀 Iniciar Proceso", use_container_width=True):
-            if depto_sel == "Seleccionar..." or colegio_sel == "Seleccionar...":
-                st.warning("⚠️ Por favor seleccione el Departamento y el Establecimiento Educativo.")
+            if depto_sel == "Seleccionar..." or municipio_sel == "Seleccionar..." or colegio_sel == "Seleccionar...":
+                st.warning("⚠️ Por favor seleccione el Departamento, Municipio y Establecimiento Educativo.")
             elif not nombre_diligencia.strip():
                 st.warning("⚠️ Por favor ingrese el nombre de quien diligencia la encuesta.")
             else:
-                fila_sel  = df_login[(df_login[col_dep] == depto_sel) & (df_login[col_nom] == colegio_sel)].iloc[0]
-                dane_sel  = str(fila_sel.get('CODIGO_DANE', '')).strip()
+                fila_sel = df_login[
+                    (df_login[col_dep] == depto_sel) &
+                    (df_login[col_mun] == municipio_sel) &
+                    (df_login[col_nom] == colegio_sel)
+                ].iloc[0]
+                dane_sel = str(fila_sel.get('CODIGO_DANE', '')).strip()
                 if es_duplicado_dane(dane_sel):
                     st.error("❌ Esta institución ya cuenta con un registro en el sistema.")
                 else:
