@@ -89,14 +89,21 @@ def cargar_desde_github():
 
 def guardar_en_github(df_completo):
     """
-    Sube el DataFrame completo al repositorio GitHub.
-    Si el archivo ya existe lo sobreescribe (necesita su SHA).
+    Sube el DataFrame completo al repositorio GitHub de manera robusta.
     """
     try:
         url, branch = _gh_url()
-        _, sha = cargar_desde_github()
+        
+        # SOLUCIÓN: Obtener el SHA de forma ligera sin descargar el contenido completo
+        sha = None
+        headers_sha = _gh_headers()
+        r_sha = requests.get(url, headers=headers_sha, params={"ref": branch}, timeout=10)
+        if r_sha.status_code == 200:
+            sha = r_sha.json().get("sha")
+
         contenido_csv = df_completo.to_csv(index=False, encoding='utf-8-sig', quoting=csv.QUOTE_ALL)
         contenido_b64 = base64.b64encode(contenido_csv.encode('utf-8-sig')).decode()
+        
         payload = {
             "message": f"Encuesta registrada {datetime.now().strftime('%Y-%m-%d %H:%M')}",
             "content": contenido_b64,
@@ -104,11 +111,11 @@ def guardar_en_github(df_completo):
         }
         if sha:
             payload["sha"] = sha
+            
         r = requests.put(url, json=payload, headers=_gh_headers(), timeout=15)
         return r.status_code in (200, 201), r.text
     except Exception as e:
         return False, str(e)
-
 # ── Lectura unificada (GitHub primero, CSV local de respaldo) ─────────
 def leer_datos():
     if _gh_disponible:
