@@ -90,7 +90,7 @@ def cargar_desde_github():
 
         if r_raw.status_code == 200:
             contenido = r_raw.content.decode("utf-8-sig")
-            df = pd.read_csv(io.StringIO(contenido), on_bad_lines='skip')
+            df = pd.read_csv(io.StringIO(contenido), engine='python',on_bad_lines='skip') # Déjalo por seguridad, pero el motor 'python' corregirá el parseo)
             return df, sha
         return pd.DataFrame(), None
     except Exception as e:
