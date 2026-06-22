@@ -75,16 +75,27 @@ def _gh_url():
     return f"https://api.github.com/repos/{repo}/contents/{GITHUB_FILE}", branch
 
 def cargar_desde_github():
-    """Lee el CSV desde GitHub y lo devuelve como DataFrame."""
+    """Lee el CSV desde GitHub usando la URL Raw (sin límites de tamaño) y obtiene el SHA de forma ligera."""
     try:
-        url, branch = _gh_url()
-        r = requests.get(url, headers=_gh_headers(), params={"ref": branch}, timeout=10)
-        if r.status_code == 200:
-            contenido = base64.b64decode(r.json()["content"]).decode("utf-8-sig")
+        url_api, branch = _gh_url()
+        repo = st.secrets["github_repo"]
+        
+        # 1. Descargar el contenido usando la URL RAW (Soporta archivos gigantes sin límite)
+        url_raw = f"https://raw.githubusercontent.com/{repo}/{branch}/{GITHUB_FILE}"
+        r_raw = requests.get(url_raw, headers=_gh_headers(), timeout=10)
+        
+        # 2. Consultar la API solo para traer el código SHA de control
+        r_api = requests.get(url_api, headers=_gh_headers(), params={"ref": branch}, timeout=10)
+        sha = r_api.json().get("sha") if r_api.status_code == 200 else None
+
+        if r_raw.status_code == 200:
+            contenido = r_raw.content.decode("utf-8-sig")
             df = pd.read_csv(io.StringIO(contenido), on_bad_lines='skip')
-            return df, r.json().get("sha")
+            return df, sha
         return pd.DataFrame(), None
-    except:
+    except Exception as e:
+        # Imprime el error interno en la consola del codespace por si necesitas debuguear
+        print(f"Error en cargar_desde_github: {str(e)}")
         return pd.DataFrame(), None
 
 def guardar_en_github(df_completo):
