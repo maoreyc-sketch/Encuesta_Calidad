@@ -745,8 +745,10 @@ if not st.session_state.iniciado:
     else:
         # ── Columnas de referencia ───────────────────────────────────
         col_dep = 'DEPARTAMENTO'          if 'DEPARTAMENTO'          in df_login.columns else df_login.columns[0]
-        col_mun = 'SECRETARIA'            if 'SECRETARIA'            in df_login.columns else None
+        col_sec = 'SECRETARIA'            if 'SECRETARIA'            in df_login.columns else None
+        col_mun = 'MUNICIPIO'             if 'MUNICIPIO'             in df_login.columns else None
         col_nom = 'NOMBRE_ESTABLECIMIENTO' if 'NOMBRE_ESTABLECIMIENTO' in df_login.columns else df_login.columns[1]
+        col_dane = 'CODIGO_DANE'          if 'CODIGO_DANE'           in df_login.columns else None
 
         # ── Filtro 1: Departamento ───────────────────────────────────
         c1, c2 = st.columns(2)
@@ -754,29 +756,60 @@ if not st.session_state.iniciado:
             departamentos = ["Seleccionar..."] + sorted(df_login[col_dep].dropna().unique().tolist())
             depto_sel = st.selectbox("📍 Departamento:", departamentos, key="sel_depto")
 
-        # ── Filtro 2: Municipio (filtrado por departamento) ──────────
+        # ── Filtro 2: Secretaría (filtrada por departamento) ─────────
         with c2:
-            if depto_sel != "Seleccionar..." and col_mun:
+            if depto_sel != "Seleccionar..." and col_sec:
                 df_por_depto  = df_login[df_login[col_dep] == depto_sel]
-                municipios    = ["Seleccionar..."] + sorted(df_por_depto[col_mun].dropna().unique().tolist())
-                municipio_sel = st.selectbox("🏙️ Municipio / Secretaría:", municipios, key="sel_municipio")
+                secretarias   = ["Seleccionar..."] + sorted(df_por_depto[col_sec].dropna().unique().tolist())
+                secretaria_sel = st.selectbox("🏛️ Secretaría:", secretarias, key="sel_secretaria")
             else:
-                st.selectbox("🏙️ Municipio / Secretaría:",
-                             ["Seleccione primero el Departamento"], disabled=True, key="sel_mun_dis")
+                st.selectbox("🏛️ Secretaría:",
+                             ["Seleccione primero el Departamento"], disabled=True, key="sel_sec_dis")
+                secretaria_sel = "Seleccionar..."
+
+        # ── Filtro 3: Municipio (filtrado por departamento + secretaría) ──
+        c3, c4 = st.columns(2)
+        with c3:
+            if depto_sel != "Seleccionar..." and secretaria_sel != "Seleccionar..." and col_mun:
+                df_por_sec    = df_login[
+                    (df_login[col_dep] == depto_sel) &
+                    (df_login[col_sec] == secretaria_sel)
+                ]
+                municipios    = ["Seleccionar..."] + sorted(df_por_sec[col_mun].dropna().unique().tolist())
+                municipio_sel = st.selectbox("🏙️ Municipio:", municipios, key="sel_municipio")
+            else:
+                st.selectbox("🏙️ Municipio:",
+                             ["Seleccione primero la Secretaría"], disabled=True, key="sel_mun_dis")
                 municipio_sel = "Seleccionar..."
 
-        # ── Filtro 3: Colegio (filtrado por municipio) ───────────────
-        if depto_sel != "Seleccionar..." and municipio_sel != "Seleccionar...":
-            df_por_mun  = df_login[
-                (df_login[col_dep] == depto_sel) &
-                (df_login[col_mun] == municipio_sel)
-            ]
-            nombres     = ["Seleccionar..."] + sorted(df_por_mun[col_nom].dropna().unique().tolist())
-            colegio_sel = st.selectbox("🏫 Establecimiento Educativo:", nombres, key="sel_colegio")
-        else:
-            st.selectbox("🏫 Establecimiento Educativo:",
-                         ["Seleccione primero el Municipio"], disabled=True, key="sel_col_dis")
-            colegio_sel = "Seleccionar..."
+        # ── Filtro 4: Colegio (filtrado por municipio, se elige por DANE) ──
+        # Mapa de etiqueta visible -> CÓDIGO DANE (único). Diferencia colegios
+        # con el mismo nombre en el mismo municipio mostrando el DANE.
+        dane_sel = ""
+        with c4:
+            if (depto_sel != "Seleccionar..." and secretaria_sel != "Seleccionar..."
+                    and municipio_sel != "Seleccionar..."):
+                df_por_mun  = df_login[
+                    (df_login[col_dep] == depto_sel) &
+                    (df_login[col_sec] == secretaria_sel) &
+                    (df_login[col_mun] == municipio_sel)
+                ].copy()
+
+                # Construir etiquetas "NOMBRE — DANE: xxxxx" y mapearlas al DANE
+                opciones_map = {}
+                for _, r in df_por_mun.iterrows():
+                    nom_r  = str(r.get(col_nom, '')).strip()
+                    dane_r = str(r.get(col_dane, '')).strip()
+                    etiqueta = f"{nom_r}  —  DANE: {dane_r}"
+                    opciones_map[etiqueta] = dane_r
+
+                etiquetas   = ["Seleccionar..."] + sorted(opciones_map.keys())
+                colegio_sel = st.selectbox("🏫 Establecimiento Educativo:", etiquetas, key="sel_colegio")
+                dane_sel    = opciones_map.get(colegio_sel, "")
+            else:
+                st.selectbox("🏫 Establecimiento Educativo:",
+                             ["Seleccione primero el Municipio"], disabled=True, key="sel_col_dis")
+                colegio_sel = "Seleccionar..."
 
         # ── Campo: quien diligencia ──────────────────────────────────
         nombre_diligencia = st.text_input(
@@ -786,17 +819,14 @@ if not st.session_state.iniciado:
         )
 
         if st.button("🚀 Iniciar Proceso", use_container_width=True):
-            if depto_sel == "Seleccionar..." or municipio_sel == "Seleccionar..." or colegio_sel == "Seleccionar...":
-                st.warning("⚠️ Por favor seleccione el Departamento, Municipio y Establecimiento Educativo.")
+            if (depto_sel == "Seleccionar..." or secretaria_sel == "Seleccionar..."
+                    or municipio_sel == "Seleccionar..." or colegio_sel == "Seleccionar..."):
+                st.warning("⚠️ Por favor seleccione el Departamento, la Secretaría, el Municipio y el Establecimiento Educativo.")
             elif not nombre_diligencia.strip():
                 st.warning("⚠️ Por favor ingrese el nombre de quien diligencia la encuesta.")
+            elif not dane_sel:
+                st.error("❌ No se pudo identificar el Código DANE del establecimiento. Verifique la selección.")
             else:
-                fila_sel = df_login[
-                    (df_login[col_dep] == depto_sel) &
-                    (df_login[col_mun] == municipio_sel) &
-                    (df_login[col_nom] == colegio_sel)
-                ].iloc[0]
-                dane_sel = str(fila_sel.get('CODIGO_DANE', '')).strip()
                 if es_duplicado_dane(dane_sel):
                     st.error("❌ Esta institución ya cuenta con un registro en el sistema.")
                 else:
